@@ -25,7 +25,7 @@ class WC_Discount_Main {
 
         register_activation_hook( __FILE__, array($this, 'activate' ) );
 
-        add_action( 'admin_menu', array( $this, 'admin_menu'), 20 );
+        //add_action( 'admin_menu', array( $this, 'admin_menu'), 20 );
         add_action( 'admin_init', array( $this, 'register_settings') );
 
         add_action( 'woocommerce_cart_calculate_fees', array( $this, 'maybe_apply_discount' ), 20, 1 );
@@ -82,6 +82,34 @@ class WC_Discount_Main {
     add_settings_field( 'porcentaje', __( 'Porcentaje (%)', 'wc-descuentos-vip' ), array( $this, 'field_porcentaje' ), 'wc_descuentos_vip', 'wc_descuentos_vip_main' );
     add_settings_field( 'minimo', __( 'Monto mínimo del carrito', 'wc-descuentos-vip' ), array( $this, 'field_minimo' ), 'wc_descuentos_vip', 'wc_descuentos_vip_main' );
 
+   }
+
+   public function sanitize_options( $input ) {
+    $out = array();
+    $out['enabled'] = ( isset( $input['enabled'] ) && $input['enabled'] === 'yes' ) ? 'yes' : 'no';
+    $out['porcentaje'] = isset( $input['porcentaje'] ) ? floatval( $input['porcentaje'] ) : 0;
+    $out['minimo'] = isset( $input['minimo'] ) ? number_format( floatval( $input['minimo'] ), 2, '.', '' ) : '0.00';
+    return $out;
+
+   }
+
+
+   public function field_enabled() {
+    $opts = get_option( $this->option_key );
+    $val = ( isset( $opts['enabled'] ) && $opts['enabled'] === 'yes' ) ? 'yes' : 'no';
+    ?>
+    <label><input type="checkbox" name="<?php echo esc_attr( $this->option_key ); ?>[enabled]" value="yes" <?php checked( $val, 'yes' ); ?> /> <?php _e( 'Habilitar descuentos VIP', 'wc-descuentos-vip' ); ?></label>
+    <?php
+
+   }
+
+   public function field_porcentaje() {
+    $opts = get_option( $this->option_key );
+    $val = isset( $opts['porcentaje'] ) ? esc_attr( $opts['porcentaje'] ) : '10';
+    ?>
+    <input type="number" step="0.01" min="0" name="<?php echo esc_attr( $this->option_key ); ?>[porcentaje]" value="<?php echo $val; ?>" /> %
+    <?php
+    
    }
 
 
