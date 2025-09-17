@@ -25,7 +25,7 @@ class WC_Discount_Main {
 
         register_activation_hook( __FILE__, array($this, 'activate' ) );
 
-        //add_action( 'admin_menu', array( $this, 'admin_menu'), 20 );
+        add_action( 'admin_menu', array( $this, 'admin_menu'), 20 );
         add_action( 'admin_init', array( $this, 'register_settings') );
 
         add_action( 'woocommerce_cart_calculate_fees', array( $this, 'maybe_apply_discount' ), 20, 1 );
@@ -74,7 +74,7 @@ class WC_Discount_Main {
 
 
    public function register_settings(){
-    register_setting( 'wc_descuento_vip_group', $this->option_key, array( $this, 'sanitize_options' ) );
+    register_setting( 'wc_descuentos_vip_group', $this->option_key, array( $this, 'sanitize_options' ) );
 
     add_settings_section( 'wc_descuentos_vip_main', __( 'Configuración Descuentos VIP', 'wc-descuentos-vip' ), null, 'wc-descuentos_vip' );
 
@@ -109,8 +109,83 @@ class WC_Discount_Main {
     ?>
     <input type="number" step="0.01" min="0" name="<?php echo esc_attr( $this->option_key ); ?>[porcentaje]" value="<?php echo $val; ?>" /> %
     <?php
-    
+
    }
+
+   public function admin_menu() {
+      add_submenu_page(
+        'woocommerce',
+        __( 'Descuentos personalizados', 'wc-descuentos-vip' ),
+        __( 'Descuentos personalizados', 'wc-descuentos-vip' ),
+        'manage_woocommerce',
+        'wc-descuentos-vip',
+        array( $this, 'admin_page' )
+     );
+
+      add_submenu_page(
+        'woocommerce',
+        __( 'Log Descuentos', 'wc-descuentos-vip' ),
+        __( 'Log Descuentos', 'wc-descuentos-vip' ),
+        'manage_woocommerce',
+        'wc-descuentos-vip-log',
+        array( $this, 'admin_log_page' )
+      );
+    }
+
+    public function admin_page() {
+      if ( ! current_user_can( 'manage_woocommerce' ) ) wp_die( __( 'No autorizado', 'wc-descuentos-vip' ) );
+      ?>
+      <div class="wrap">
+        <h1><?php _e( 'Descuentos personalizados VIP', 'wc-descuentos-vip' ); ?></h1>
+         <form method="post" action="options.php">
+            <?php
+            settings_fields( 'wc_descuentos_vip_group' );
+            do_settings_sections( 'wc_descuentos_vip' );
+            submit_button();
+            ?>
+         </form>
+        </div>
+      <?php
+    }
+
+    public function maybe_apply_discount( $cart ) {
+      if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
+      if ( ! WC()->cart ) return;
+
+      $opts = get_option( $this->option_key );
+      if ( empty( $opts['enabled'] ) || $opts['enabled'] !== 'yes' ) return;
+
+      $user_id = get_current_user_id();
+      if ( ! $user_id ) return;
+
+      $user = get_userdata( $user_id );
+      if ( ! $user ) return;
+
+      $roles = (array) $user->roles;
+      if ( ! in_array( 'cliente_vip', $roles, true ) ) return;
+
+      $minimo = isset( $opts['minimo'] ) ? floatval( $opts['minimo'] ) : 0;
+      $porc = isset( $opts['porcentaje'] ) ? floatval( $opts['porcentaje'] ) : 0;
+
+      $subtotal = floatval( WC()->cart->subtotal );
+
+      if ( $subtotal < $minimo ) return;
+
+      $descuento = round( $subtotal * ( $porc / 100 ), 2 );
+
+      if ( $descuento <= 0 ) return;
+
+      $label = sprintf( __( 'Descuento VIP (%s%%)', 'wc-descuentos-vip' ), number_format( $porc, 2 ) );
+      WC()->cart->add_fee( $label, -$descuento );
+
+      WC()->session->set( 'wc_descuentos_vip_aplicado', array(
+        'user_id' => $user_id,
+        'descuento' => $descuento,
+        'porcentaje' => $porc,
+        'subtotal' => $subtotal,
+        'timestamp' => current_time( 'mysql' ),
+      ) );
+    }
 
 
 }
